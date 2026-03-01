@@ -1,0 +1,295 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VCT Live Telemetry</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: { 
+                    colors: { 
+                        valored: '#ff4655', 
+                        valodark: '#0f1923', 
+                        valoblack: '#000000',
+                        valogray: '#ece8e1' 
+                    },
+                    fontFamily: {
+                        'header': ['Teko', 'sans-serif'],
+                        'body': ['Rajdhani', 'sans-serif']
+                    },
+                    backgroundImage: {
+                        'tactical-grid': 'radial-gradient(circle, rgba(255,70,85,0.1) 1px, transparent 1px)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .bg-tactical-grid { background-size: 30px 30px; }
+        .neon-glow { text-shadow: 0 0 10px rgba(255, 70, 85, 0.8); }
+        .box-glow { box-shadow: 0 0 15px rgba(255, 70, 85, 0.2); }
+        /* Angled cut-out effect for cards */
+        .clip-angled { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%); }
+    </style>
+</head>
+<body class="bg-valodark bg-tactical-grid text-valogray font-body min-h-screen p-6 md:p-10">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="flex items-center justify-between mb-10 border-b border-gray-800 pb-4">
+            <div class="mb-10 bg-valoblack p-6 border border-gray-800 rounded box-glow flex items-center justify-between">
+            <div class="flex-1 mr-4">
+                <input type="text" id="stream-url" placeholder="Paste Twitch URL, YouTube Link, or local .mp4 path..." class="w-full bg-gray-900 border border-gray-700 text-white px-4 py-3 rounded outline-none focus:border-valored transition-colors text-lg">
+            </div>
+            <button onclick="startPipeline()" id="start-btn" class="bg-valored text-white font-header text-2xl uppercase tracking-widest px-10 py-2 rounded hover:bg-red-600 transition-colors">
+                [ START PIPELINE ]
+            </button>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="w-4 h-4 rounded-full bg-valored animate-pulse neon-glow"></div>
+                <h1 class="text-5xl font-header tracking-widest text-white uppercase mt-2">Live <span class="text-valored">Telemetry</span></h1>
+            </div>
+            <div class="text-right">
+                <p class="text-valored font-bold tracking-widest text-sm uppercase">Live Analysis</p>
+                <p class="text-4xl font-header tracking-wide text-white">MATCH <span class="text-gray-600">IN</span> PROGRESS</p>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div class="bg-valoblack clip-angled border-l-4 border-valored p-6 box-glow relative overflow-hidden">
+                <div class="absolute -right-4 -top-4 opacity-10 text-9xl font-header text-valored">K</div>
+                <h3 class="text-gray-400 font-bold tracking-widest uppercase text-sm">Confirmed Kills</h3>
+                <p id="total-kills" class="text-6xl font-header text-white mt-1">0</p>
+            </div>
+            <div class="bg-valoblack clip-angled border-l-4 border-gray-600 p-6 relative overflow-hidden">
+                <div class="absolute -right-4 -top-4 opacity-10 text-9xl font-header text-white">H</div>
+                <h3 class="text-gray-400 font-bold tracking-widest uppercase text-sm">Total Headshots</h3>
+                <p id="total-hs" class="text-6xl font-header text-white mt-1">0</p>
+            </div>
+            <div class="bg-valoblack clip-angled border-l-4 border-gray-600 p-6 relative overflow-hidden">
+                <div class="absolute -right-4 -top-4 opacity-10 text-9xl font-header text-white">%</div>
+                <h3 class="text-gray-400 font-bold tracking-widest uppercase text-sm">Headshot Accuracy</h3>
+                <p id="hs-percent" class="text-6xl font-header text-white mt-1">0%</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <h2 class="text-3xl font-header text-white mb-4 uppercase tracking-wider">Combat Log</h2>
+                <div class="bg-valoblack rounded border border-gray-800 overflow-hidden box-glow">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-900 text-valored font-bold uppercase tracking-wider border-b border-gray-800">
+                                <th class="p-4 w-1/3">Killer</th>
+                                <th class="p-4 w-1/3">Victim</th>
+                                <th class="p-4">Weapon</th>
+                                <th class="p-4 text-center">HS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="killfeed-body" class="divide-y divide-gray-900 text-lg">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-3xl font-header text-white mb-4 uppercase tracking-wider">Top Fraggers</h2>
+                <div id="leaderboard" class="bg-valoblack clip-angled p-6 border border-gray-800 space-y-5">
+                    </div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-valoblack border border-gray-800 p-6 rounded box-glow relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 opacity-10 text-9xl font-header text-valored">AI</div>
+            <h2 class="text-3xl font-header text-white mb-2 uppercase tracking-wider flex items-center">
+                <span class="mr-3 text-valored">[VOICE]</span> Dashboard Narrator Agent
+            </h2>
+            <p class="text-gray-400 mb-4 font-bold text-sm uppercase tracking-widest">Ask natural language questions about the live telemetry data.</p>
+            
+            <div class="flex space-x-4">
+                <input type="text" id="agent-query" placeholder="e.g., Who is dominating the match right now?" class="flex-1 bg-gray-900 border border-gray-700 text-white px-4 py-3 rounded outline-none focus:border-valored transition-colors">
+                <button onclick="askNarrator()" id="ask-btn" class="bg-valored text-white font-bold uppercase tracking-widest px-8 py-3 rounded hover:bg-red-600 transition-colors">
+                    Ask Agent
+                </button>
+            </div>
+            
+            <div id="agent-response" class="mt-4 text-xl text-valored font-bold min-h-[2rem]"></div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch official weapon icons from Valorant API
+        let weaponIcons = {};
+        
+        async function loadWeaponIcons() {
+            try {
+                const res = await fetch('https://valorant-api.com/v1/weapons');
+                const apiData = await res.json();
+                
+                // Map the weapon name (e.g., "Ghost") to its official killfeed icon URL
+                apiData.data.forEach(weapon => {
+                    weaponIcons[weapon.displayName.toLowerCase()] = weapon.killStreamIcon;
+                });
+                console.log("Weapon icons loaded from valorant-api.com");
+            } catch (error) {
+                console.error("Failed to load weapon icons:", error);
+            }
+        }
+        
+        // Run this once when the dashboard opens
+        loadWeaponIcons();
+
+        async function fetchLiveStats() {
+            try {
+                const response = await fetch('/api/kills');
+                const data = await response.json();
+
+                if (data.status === "error") {
+                    console.error("Backend Error:", data.message);
+                    return;
+                }
+
+                // Update Metrics
+                document.getElementById('total-kills').innerText = data.total_kills;
+                document.getElementById('total-hs').innerText = data.headshots;
+                document.getElementById('hs-percent').innerText = data.hs_percentage + '%';
+
+                // Update Killfeed
+                const tbody = document.getElementById('killfeed-body');
+                tbody.innerHTML = '';
+                data.kills.forEach(kill => {
+                    const hsIcon = kill.is_headshot
+                        ? '<span class="text-valored neon-glow">&#127919;</span>'
+                        : '<span class="text-gray-700">&mdash;</span>';
+                    
+                    // Check if we have the icon, otherwise fallback to text
+                    const safeWeaponName = kill.weapon_used ? kill.weapon_used.toLowerCase() : "unknown";
+                    const iconUrl = weaponIcons[safeWeaponName];
+                    
+                    const weaponDisplay = iconUrl 
+                        ? `<img src="${iconUrl}" alt="${kill.weapon_used}" class="h-8 object-contain" title="${kill.weapon_used}">`
+                        : `<span class="text-gray-400 uppercase tracking-widest text-sm">${kill.weapon_used}</span>`;
+
+                    const row = `
+                        <tr class="hover:bg-gray-800 transition-colors">
+                            <td class="p-4 font-bold text-white">${kill.killer_name}</td>
+                            <td class="p-4 text-gray-500">${kill.victim_name}</td>
+                            <td class="p-4 flex items-center h-16">${weaponDisplay}</td>
+                            <td class="p-4 text-center text-2xl">${hsIcon}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+
+                // Update Leaderboard
+                const leaderboard = document.getElementById('leaderboard');
+                leaderboard.innerHTML = '';
+                if(data.top_fraggers.length === 0) {
+                    leaderboard.innerHTML = '<p class="text-gray-500">Awaiting data...</p>';
+                }
+
+                data.top_fraggers.forEach((player, index) => {
+                    // Normalize bar width based on the top player's kills
+                    const maxKills = data.top_fraggers[0].kills || 1;
+                    const barWidth = (player.kills / maxKills) * 100;
+                    
+                    // Highlight the #1 player in Red
+                    const barColor = index === 0 ? 'bg-valored' : 'bg-gray-500';
+                    const nameColor = index === 0 ? 'text-white font-bold' : 'text-gray-300';
+
+                    const item = `
+                        <div>
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="${nameColor} text-xl">${index + 1}. ${player.name}</span>
+                                <span class="text-valored font-header text-2xl">${player.kills} <span class="text-sm text-gray-500">KILLS</span></span>
+                            </div>
+                            <div class="w-full bg-gray-900 h-2">
+                                <div class="${barColor} h-2 transition-all duration-1000 ease-out" style="width: ${barWidth}%"></div>
+                            </div>
+                        </div>
+                    `;
+                    leaderboard.innerHTML += item;
+                });
+
+            } catch (error) {
+                console.error("Error fetching live stats:", error);
+            }
+
+
+        }
+
+        // The Voice Narrator Logic
+        async function askNarrator() {
+            const queryInput = document.getElementById('agent-query');
+            const responseDiv = document.getElementById('agent-response');
+            const btn = document.getElementById('ask-btn');
+            
+            const query = queryInput.value;
+            if (!query) return;
+
+            // UI loading state
+            btn.innerText = "Analyzing...";
+            responseDiv.innerText = "Thinking...";
+            responseDiv.className = "mt-4 text-xl text-gray-400 font-bold animate-pulse";
+
+            try {
+                const res = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    responseDiv.className = "mt-4 text-xl text-white font-bold";
+                    responseDiv.innerText = data.answer;
+
+                    // Text-to-speech output
+                    const speech = new SpeechSynthesisUtterance(data.answer);
+                    speech.rate = 1.0;
+                    speech.pitch = 1.0;
+                    window.speechSynthesis.speak(speech);
+                } else {
+                    responseDiv.innerText = "Error analyzing data.";
+                }
+            } catch (e) {
+                responseDiv.innerText = "Connection failed.";
+            } finally {
+                btn.innerText = "Ask Agent";
+            }
+        }
+
+        async function startPipeline() {
+            const urlInput = document.getElementById('stream-url').value;
+                if (!urlInput) {
+                    alert("Please paste a YouTube or Twitch link first!");
+                    return;
+                }
+            const btn = document.getElementById('start-btn');
+            
+            btn.innerText = "CONNECTING...";
+            btn.classList.add("animate-pulse");
+
+            try {
+                await fetch('/api/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput })
+                });
+                btn.innerText = "PIPELINE ACTIVE";
+                btn.classList.remove("animate-pulse");
+                btn.classList.replace("bg-valored", "bg-green-600");
+            } catch (e) {
+                btn.innerText = "CONNECTION FAILED";
+            }
+        }
+
+
+        // Poll every 2 seconds
+        setInterval(fetchLiveStats, 2000);
+        fetchLiveStats(); // Initial call
+    </script>
+</body>
+</html>
